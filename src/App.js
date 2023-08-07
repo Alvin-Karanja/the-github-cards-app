@@ -1,29 +1,52 @@
-// import logo from './logo.svg';
+// App.css
+/* Add your CSS styles here */
+
+// App.js
 import React from 'react';
 import ReactDOM from 'react-dom';
 import './App.css';
+import axios from 'axios';
 
-const testData = [
-    {name: "Dan Abramov", avatar_url: "https://avatars0.githubusercontent.com/u/810438?v=4", company: "@facebook"},
-    {name: "Sophie Alpert", avatar_url: "https://avatars2.githubusercontent.com/u/6820?v=4", company: "Humu"},
-    {name: "Sebastian Markbåge", avatar_url: "https://avatars2.githubusercontent.com/u/63648?v=4", company: "Facebook"},
-];
-
-const CardList = (props) => (
+const CardList = ({ profiles, removeProfile }) => (
     <div>
-        {props.profiles.map(profile => <Card {...profile}/>)}
+        {profiles.map(profile => (
+            <Card key={profile.id} profile={profile} removeProfile={removeProfile} />
+        ))}
     </div>
 );
 
 class Card extends React.Component {
+    state = {
+        showDetails: false,
+    };
+
+    toggleDetails = () => {
+        this.setState(prevState => ({
+            showDetails: !prevState.showDetails,
+        }));
+    };
+
     render() {
-        const profile = this.props;
+        const { profile, removeProfile } = this.props;
+        const { showDetails } = this.state;
+
         return (
             <div className="github-profile">
-                <img src={profile.avatar_url}  alt="profile avatar/image"/>
+                <img src={profile.avatar_url} alt="profile avatar/image" />
                 <div className="info">
                     <div className="name">{profile.name}</div>
                     <div className="company">{profile.company}</div>
+                    <button onClick={this.toggleDetails}>
+                        {showDetails ? 'Hide Details' : 'Show Details'}
+                    </button>
+                    <button onClick={() => removeProfile(profile.id)}>Remove</button>
+                    {showDetails && (
+                        <div className="details">
+                            <p>{profile.bio}</p>
+                            <p>Followers: {profile.followers}</p>
+                            {/* Add more details as needed */}
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -31,11 +54,27 @@ class Card extends React.Component {
 }
 
 class Form extends React.Component {
-    state = { userName: '' };
-    handleSubmit = (event) => {
-        event.preventDefault();
-        console.log(this.state.userName);
+    state = {
+        userName: '',
+        error: null, // Add error state for invalid input
     };
+
+    handleSubmit = async (event) => {
+        event.preventDefault();
+
+        try {
+            const resp = await axios.get(`https://api.github.com/users/${this.state.userName}`);
+            this.props.onSubmit(resp.data);
+            this.setState({ userName: '', error: null }); // Clear error state on success
+        } catch (error) {
+            if (error.response && error.response.status === 404) {
+                this.setState({ error: 'User not found' }); // Set error state for invalid input
+            } else {
+                this.setState({ error: 'Network error' }); // Set error state for other network problems
+            }
+        }
+    };
+
     render() {
         return (
             <form onSubmit={this.handleSubmit}>
@@ -47,6 +86,7 @@ class Form extends React.Component {
                     required
                 />
                 <button>Add card</button>
+                {this.state.error && <div className="error">{this.state.error}</div>}
             </form>
         );
     }
@@ -54,14 +94,34 @@ class Form extends React.Component {
 
 class App extends React.Component {
     state = {
-        profiles: testData,
+        profiles: [],
+        networkError: false, // Add network error state
     };
+
+    addNewProfile = async (profileData) => {
+        try {
+            this.setState({ networkError: false }); // Clear network error state
+            this.setState(prevState => ({
+                profiles: [...prevState.profiles, profileData],
+            }));
+        } catch (error) {
+            this.setState({ networkError: true }); // Set network error state
+        }
+    };
+
+    removeProfile = (id) => {
+        this.setState(prevState => ({
+            profiles: prevState.profiles.filter(profile => profile.id !== id),
+        }));
+    };
+
     render() {
         return (
             <div>
                 <div className="header">The Github Cards App</div>
-                <Form />
-                <CardList profiles={this.state.profiles} />
+                {this.state.networkError && <div className="error">Network error occurred</div>}
+                <Form onSubmit={this.addNewProfile} />
+                <CardList profiles={this.state.profiles} removeProfile={this.removeProfile} />
             </div>
         );
     }
@@ -69,26 +129,5 @@ class App extends React.Component {
 
 const mountnode = document.getElementById('root');
 ReactDOM.render(<App />, mountnode);
-
-// function App() {
-//   return (
-//     <div className="App">
-//       <header className="App-header">
-//         <img src={logo} className="App-logo" alt="logo" />
-//         <p>
-//           Edit <code>src/App.js</code> and save to reload.
-//         </p>
-//         <a
-//           className="App-link"
-//           href="https://reactjs.org"
-//           target="_blank"
-//           rel="noopener noreferrer"
-//         >
-//           Learn React
-//         </a>
-//       </header>
-//     </div>
-//   );
-// }
 
 export default App;
